@@ -1,0 +1,49 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 新しい push が待機中のデプロイを置きかえる。実行中のものは止めない
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  # 立体に閉じない展開図のまま公開されることがないようにする
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # index.html は Artifact 用の断片なので、配信前にスケルトンで包む
+      - name: 単体ページをビルド
+        run: ./build.sh
+
+      # enablement により workflow 側で Pages を有効化できる（手動設定が不要）
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

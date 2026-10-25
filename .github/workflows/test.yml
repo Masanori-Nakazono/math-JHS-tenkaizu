@@ -1,0 +1,28 @@
+name: Regression tests
+
+on:
+  pull_request:
+  push:
+    # main はデプロイ workflow が公開前に呼ぶ
+    branches-ignore: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 展開図がぴったり立体に閉じるか（閉合誤差・重なり・オイラーの多面体定理）
+      - name: 展開図と立体の整合を検証
+        run: node test-geometry.mjs
+
+      # 配信する単体ページが実際に組み上がるか
+      - name: 単体ページのビルド
+        run: ./build.sh
