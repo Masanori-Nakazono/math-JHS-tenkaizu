@@ -1,0 +1,1222 @@
+<title>展開図ラボ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Kaku+Gothic+New:wght@700&family=DM+Mono:wght@500&display=swap">
+
+<style>
+/* レイアウト：立体のステージを主役に、右（狭い画面では下）に「えらぶ・かえる・しらべる」を積む。
+   文字より絵で分かることを優先し、色は色覚の違いがあっても区別できる配色（岡部・伊藤）を使う。 */
+:root{
+  --bg:#eceff3;
+  --panel:#ffffff;
+  --panel-2:#f2f5f8;
+  --line:#d4dbe3;
+  --track:#d9e0e7;
+  --ink:#15202b;
+  --ink-2:#53616e;
+  --ink-3:#83919e;
+  --accent:#0072b2;          /* 岡部・伊藤の青 */
+  --accent-ink:#ffffff;
+  --accent-soft:#e1eef8;
+  --stage-top:#e6ebf1;
+  --stage-bottom:#d4dde5;
+  --shadow:0 1px 2px rgba(21,32,43,.07), 0 10px 26px rgba(21,32,43,.07);
+  --font-display:"Zen Kaku Gothic New","BIZ UDPGothic","Hiragino Kaku Gothic ProN",system-ui,sans-serif;
+  --font-ui:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+  --font-num:"DM Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121920; --panel:#1a222a; --panel-2:#222c35; --line:#2e3b46; --track:#2e3b46;
+    --ink:#e8eef4; --ink-2:#a6b4bf; --ink-3:#7a8894;
+    --accent:#56b4e9; --accent-ink:#0b1116; --accent-soft:#17293a;
+    --stage-top:#1a232b; --stage-bottom:#0e151a;
+    --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 26px rgba(0,0,0,.32);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121920; --panel:#1a222a; --panel-2:#222c35; --line:#2e3b46; --track:#2e3b46;
+  --ink:#e8eef4; --ink-2:#a6b4bf; --ink-3:#7a8894;
+  --accent:#56b4e9; --accent-ink:#0b1116; --accent-soft:#17293a;
+  --stage-top:#1a232b; --stage-bottom:#0e151a;
+  --shadow:0 1px 2px rgba(0,0,0,.45), 0 10px 26px rgba(0,0,0,.32);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:var(--font-ui);font-size:15px;line-height:1.75;
+  -webkit-font-smoothing:antialiased;
+}
+.app{
+  height:100%;display:flex;flex-direction:column;gap:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:14px 16px;
+  max-width:1280px;margin:0 auto;width:100%;
+}
+
+/* ---- ヘッダ ---- */
+.bar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;min-width:0}
+.bar h1{font-family:var(--font-display);font-weight:700;font-size:21px;letter-spacing:.06em;margin:0;white-space:nowrap}
+.bar p{margin:0;color:var(--ink-2);font-size:14px;min-width:0}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;flex:1;min-height:0}
+@media (max-width:900px){
+  .app{height:auto;padding-block:12px 24px}
+  .cols{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---- ステージ ---- */
+.stage{
+  background:linear-gradient(180deg,var(--stage-top),var(--stage-bottom));
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;min-height:0;overflow:hidden;position:relative;
+}
+#view{flex:1;min-height:340px;display:block;width:100%;touch-action:none;cursor:grab}
+#view.grabbing{cursor:grabbing}
+@media (max-width:900px){#view{min-height:0;height:46vh}}
+.hint{position:absolute;left:14px;top:11px;font-size:12px;color:var(--ink-3);pointer-events:none}
+.badge{
+  position:absolute;right:14px;top:11px;font-family:var(--font-num);font-size:12px;
+  color:var(--ink-2);background:color-mix(in srgb,var(--panel) 76%,transparent);
+  border:1px solid var(--line);border-radius:999px;padding:2px 11px;pointer-events:none;
+}
+
+/* ---- 折りたたみ操作（画面の主役） ---- */
+.fold{border-top:1px solid var(--line);background:var(--panel);padding:12px 14px 14px}
+#t{-webkit-appearance:none;appearance:none;background:transparent;width:100%;height:34px;margin:0;display:block}
+#t::-webkit-slider-runnable-track{
+  height:12px;border-radius:999px;
+  background:linear-gradient(90deg,var(--accent) var(--p,0%),var(--track) var(--p,0%));
+}
+#t::-webkit-slider-thumb{
+  -webkit-appearance:none;width:32px;height:32px;border-radius:50%;margin-top:-10px;
+  background:var(--panel);border:4px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer;
+}
+#t::-moz-range-track{height:12px;border-radius:999px;background:var(--track)}
+#t::-moz-range-progress{height:12px;border-radius:999px;background:var(--accent)}
+#t::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--panel);
+  border:4px solid var(--accent);box-shadow:0 1px 5px rgba(0,0,0,.28);cursor:pointer}
+
+.foldrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+.end{
+  display:flex;align-items:center;gap:9px;min-height:52px;padding:4px 12px 4px 6px;
+  border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+  color:var(--ink);font:inherit;font-size:14px;font-weight:700;cursor:pointer;
+}
+.end:hover{border-color:var(--accent);color:var(--accent)}
+.end svg{width:40px;height:40px;display:block;color:var(--ink-2);flex:none}
+.end:hover svg{color:var(--accent)}
+.play{
+  flex:none;width:56px;height:56px;border-radius:50%;border:1px solid var(--line);
+  background:var(--panel-2);color:var(--ink);cursor:pointer;display:grid;place-items:center;
+  font-size:17px;line-height:1;
+}
+.play:hover{border-color:var(--accent);color:var(--accent)}
+.play[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+@media (max-width:430px){
+  .end{padding:4px 9px 4px 5px;gap:6px;font-size:13px}
+  .end svg{width:32px;height:32px}
+  .play{width:50px;height:50px}
+}
+
+/* ---- 右パネル ---- */
+.panel{display:flex;flex-direction:column;gap:12px;min-height:0;overflow-y:auto}
+@media (max-width:900px){.panel{overflow:visible}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:13px 14px 14px}
+.card h2{font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:.1em;color:var(--ink-3);margin:0 0 10px}
+
+/* 立体をえらぶ：文字ではなく見取図で選ぶ */
+.gl{font-size:12px;color:var(--ink-3);margin:10px 0 5px}
+.gl:first-child{margin-top:0}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:7px}
+.tile{
+  display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px 6px;
+  border:1px solid var(--line);border-radius:12px;background:var(--panel-2);
+  color:var(--ink-2);font:inherit;font-size:12px;line-height:1.35;cursor:pointer;min-height:80px;
+}
+.tile svg{width:46px;height:46px;display:block}
+.tile span{color:var(--ink);font-size:12px;text-align:center}
+.tile:hover{border-color:var(--accent);color:var(--accent)}
+.tile[aria-pressed="true"]{
+  background:var(--accent-soft);border-color:var(--accent);color:var(--accent);
+  box-shadow:inset 0 0 0 1px var(--accent);
+}
+.tile[aria-pressed="true"] span{color:var(--accent);font-weight:700}
+
+.caption{margin:11px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-2)}
+.wide{
+  width:100%;margin-top:10px;min-height:46px;border:1px solid var(--line);border-radius:12px;
+  background:var(--panel-2);color:var(--ink);font:inherit;font-size:14px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.wide:hover{border-color:var(--accent);color:var(--accent)}
+.wide small{font-weight:400;color:var(--ink-3);font-size:12px}
+
+/* 大きさ */
+.ctl{margin-bottom:10px}
+.ctl:last-child{margin-bottom:0}
+.ctl .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.ctl label{font-size:13.5px;color:var(--ink-2)}
+.ctl output{font-family:var(--font-num);font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ctl input[type=range]{width:100%;height:30px;accent-color:var(--accent);margin:0}
+
+/* しらべる */
+.counts{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:11px}
+.count{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:7px 4px;text-align:center}
+.count svg{width:22px;height:22px;color:var(--ink-3);display:block;margin:0 auto}
+.count b{display:block;font-family:var(--font-display);font-size:23px;line-height:1.2;color:var(--ink)}
+.count span{font-size:11.5px;color:var(--ink-2)}
+.euler{
+  background:var(--accent-soft);border-radius:10px;padding:7px 11px;margin-bottom:11px;
+  font-family:var(--font-num);font-size:14px;color:var(--accent);text-align:center;font-variant-numeric:tabular-nums;
+}
+table.stats{width:100%;border-collapse:collapse;font-size:13.5px}
+table.stats th,table.stats td{padding:3px 0;text-align:left;vertical-align:baseline}
+table.stats th{font-weight:400;color:var(--ink-2);white-space:nowrap;padding-right:10px}
+table.stats td{font-family:var(--font-num);font-variant-numeric:tabular-nums;text-align:right;color:var(--ink)}
+.notes{margin:10px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:13px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px}
+.notes b{font-weight:700;color:var(--ink);font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:3px 14px;margin-top:9px;font-size:12.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:13px;height:13px;border-radius:4px;margin-right:6px;vertical-align:-2px}
+.legend i.dash{border-radius:0;height:0;border-top:3px dashed var(--ink-3);width:16px;vertical-align:4px}
+
+/* みせかた：タップしやすい行 */
+.opts{display:flex;flex-direction:column}
+.opt{display:flex;align-items:center;gap:11px;min-height:46px;font-size:13.5px;color:var(--ink);cursor:pointer;
+  border-top:1px solid var(--line);padding:2px 0}
+.opt:first-child{border-top:0}
+.opt input{accent-color:var(--accent);width:20px;height:20px;flex:none;margin:0}
+
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <h1>展開図ラボ</h1>
+    <p>立体を切り開くと展開図、組み立てると立体にもどります。</p>
+  </header>
+
+  <div class="cols">
+    <section class="stage">
+      <canvas id="view"></canvas>
+      <div class="hint">ドラッグで回す・ピンチやホイールで拡大</div>
+      <div class="badge" id="badge">展開図</div>
+      <div class="fold">
+        <input type="range" id="t" min="0" max="1" step="0.001" value="0" aria-label="切り開く・組み立てる">
+        <div class="foldrow">
+          <button class="end" id="toFlat" type="button"><span id="thNet"></span><span class="lb">切り開く</span></button>
+          <button class="play" id="play" type="button" aria-pressed="false" aria-label="動かす">▶</button>
+          <button class="end" id="toSolid" type="button"><span class="lb">組み立てる</span><span id="thSolid"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <section class="card">
+        <h2>立体をえらぶ</h2>
+        <div id="picker"></div>
+        <p class="caption" id="caption"></p>
+        <button class="wide" id="revar" type="button">ちがう辺で切り開く <small>展開図は1通りではない</small></button>
+      </section>
+
+      <section class="card">
+        <h2>大きさをかえる</h2>
+        <div id="controls"></div>
+      </section>
+
+      <section class="card">
+        <h2>しらべる</h2>
+        <div class="counts" id="counts"></div>
+        <div class="euler" id="euler" hidden></div>
+        <table class="stats"><tbody id="stats"></tbody></table>
+        <div class="notes" id="notes"></div>
+        <div class="legend" id="legend"></div>
+      </section>
+
+      <section class="card">
+        <h2>みせかた</h2>
+        <div class="opts" id="opts"></div>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
+import * as G from "./geometry.js";
+
+const $ = (id) => document.getElementById(id);
+const TAU = Math.PI * 2;
+const fmt = (x, d = 2) => {
+  const v = Math.abs(x) < 1e-9 ? 0 : x;
+  return v.toFixed(d).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+};
+
+/* ====== 配色：岡部・伊藤のカラーユニバーサルデザイン配色 ======
+   色覚の型がちがっても見分けやすい組み合わせ。色だけに頼らず、
+   番号・記号・線の種類（実線＝切り口 / 破線＝折り目）も併用する。 */
+const CUD = [0xe69f00, 0x56b4e9, 0x009e73, 0xd55e00, 0x0072b2, 0xcc79a7, 0xf0e442];
+const COL_SIDE = 0x56b4e9;   // 側面
+const COL_BASE = 0xe69f00;   // 底面
+const COL_FOLD = 0x97a3ae;   // 折り目
+const COL_CUT = 0x6b7884;    // 切り口（色分けしないとき）
+const faceColor = (kind, i) =>
+  new THREE.Color(kind === "side" ? COL_SIDE : kind === "base" ? COL_BASE : CUD[i % CUD.length]);
+const pairColor = (p) => new THREE.Color(CUD[p % CUD.length]);
+const hex6 = (n) => "#" + n.toString(16).padStart(6, "0");
+
+/* ================= three.js ================= */
+const canvas = $("view");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x70808e, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 1.45);
+key.position.set(2.6, 4.2, 2.2);
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+fill.position.set(-3, 1.4, -2.4);
+scene.add(fill);
+
+// root: 展開図の平面を床に寝かせる / pose: 組み上がった立体を正しい向きへ / inner: 中心ぞろえ
+const root = new THREE.Object3D();
+root.rotation.x = -Math.PI / 2;
+scene.add(root);
+const pose = new THREE.Object3D();
+root.add(pose);
+const inner = new THREE.Object3D();
+pose.add(inner);
+
+/* ---- 回す・拡大する ---- */
+// 展開図は真上ぎみ、立体は斜め上から見るのが分かりやすいので、
+// ユーザーが自分で回すまでは視点を折りたたみに合わせて動かす
+const cam = { theta: -0.62, phi: 1.03, zoom: 1, base: 3.5 };
+let userMoved = false;
+function fitDistance() {
+  const vf = (camera.fov * Math.PI) / 360;
+  const hf = Math.atan(Math.tan(vf) * camera.aspect);
+  cam.base = 1.0 / Math.sin(Math.min(vf, hf));
+}
+function placeCamera() {
+  const { theta, phi } = cam;
+  const dist = cam.base * cam.zoom;
+  camera.position.set(
+    dist * Math.sin(phi) * Math.cos(theta),
+    dist * Math.cos(phi),
+    dist * Math.sin(phi) * Math.sin(theta)
+  );
+  camera.lookAt(0, 0, 0);
+}
+const ptrs = new Map();
+let pinch0 = 0;
+const pinchDist = () => {
+  const [a, b] = [...ptrs.values()];
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+};
+canvas.addEventListener("pointerdown", (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  canvas.classList.add("grabbing");
+  if (ptrs.size === 2) pinch0 = pinchDist();
+});
+canvas.addEventListener("pointermove", (e) => {
+  if (!ptrs.has(e.pointerId)) return;
+  userMoved = true;
+  const prev = ptrs.get(e.pointerId);
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size >= 2) {
+    const d = pinchDist();
+    if (pinch0 > 0 && d > 0) cam.zoom = Math.min(2.6, Math.max(0.45, cam.zoom * (pinch0 / d)));
+    pinch0 = d;
+  } else {
+    cam.theta -= (e.clientX - prev[0]) * 0.007;
+    cam.phi = Math.min(Math.PI - 0.06, Math.max(0.06, cam.phi - (e.clientY - prev[1]) * 0.007));
+  }
+  placeCamera();
+  redraw();
+});
+const endPtr = (e) => {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) pinch0 = 0;
+  if (ptrs.size === 0) canvas.classList.remove("grabbing");
+};
+canvas.addEventListener("pointerup", endPtr);
+canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  userMoved = true;
+  cam.zoom = Math.min(2.6, Math.max(0.45, cam.zoom * (1 + e.deltaY * 0.0014)));
+  placeCamera();
+  redraw();
+}, { passive: false });
+
+function resize() {
+  const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  fitDistance();
+  placeCamera();
+  draw();
+}
+new ResizeObserver(resize).observe(canvas);
+
+/* ================= 状態 ================= */
+let preset = G.PRESETS[0];
+let params = { ...preset.params };
+let variant = 0;
+let model = null, built = null;
+let radii = [1, 1], radius = 1;
+let t = 0, playing = false, dirSign = 1, lastT = 0;
+const opt = { pair: true, vtx: false, num: false, glass: false, pose: true };
+const TOGGLES = [
+  { k: "pair", label: "くっつく辺に色と番号をつける" },
+  { k: "vtx", label: "頂点に記号（A・B・C…）をつける" },
+  { k: "num", label: "面に番号をつける" },
+  { k: "glass", label: "面を半透明にする" },
+  { k: "pose", label: "立体をまっすぐ立てる" },
+];
+function radiusAt(tt) {
+  const a = Math.min(1, Math.max(0, tt)) * (radii.length - 1);
+  const i = Math.min(radii.length - 2, Math.floor(a));
+  return (radii[i] + (radii[i + 1] - radii[i]) * (a - i)) * 1.03;
+}
+
+/* ================= 丸いラベル（番号・記号） ================= */
+const texCache = new Map();
+function discTexture(text, bg, fg) {
+  const k = text + "|" + bg + "|" + fg;
+  if (texCache.has(k)) return texCache.get(k);
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const g = c.getContext("2d");
+  g.fillStyle = bg;
+  g.beginPath();
+  g.arc(s / 2, s / 2, s * 0.43, 0, TAU);
+  g.fill();
+  g.strokeStyle = "rgba(255,255,255,.85)";
+  g.lineWidth = 6;
+  g.stroke();
+  g.fillStyle = fg;
+  g.font = `700 ${text.length > 1 ? 56 : 68}px "DM Mono", ui-monospace, monospace`;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(text, s / 2, s / 2 + 3);
+  const tex = new THREE.CanvasTexture(c);
+  texCache.set(k, tex);
+  return tex;
+}
+// 明るい色の上は黒文字、暗い色の上は白文字にする
+function inkOn(hex) {
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#11181f" : "#ffffff";
+}
+function makeSprite(tex, depthWrite = false) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite, transparent: true }));
+  sp.visible = false;
+  inner.add(sp);
+  return sp;
+}
+
+/* ================= 展開図の面と辺 ================= */
+function fanIndices(n) {
+  const idx = [];
+  for (let i = 1; i < n - 1; i++) idx.push(0, i, i + 1);
+  return idx;
+}
+/** 多角形の内側にふちどりの帯をつくる。折り目は破線、切り口は実線。 */
+function borderStrip(poly, styleOf) {
+  const n = poly.length;
+  let cx = 0, cy = 0;
+  for (const p of poly) { cx += p[0]; cy += p[1]; }
+  cx /= n; cy /= n;
+  const pos = [], idx = [], quadEdge = [], edgeInfo = [];
+  for (let i = 0; i < n; i++) {
+    const a = poly[i], b = poly[(i + 1) % n];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    const len = Math.hypot(ex, ey) || 1;
+    let nx = -ey / len, ny = ex / len;
+    if (nx * (cx - a[0]) + ny * (cy - a[1]) < 0) { nx = -nx; ny = -ny; }
+    const st = styleOf(i);
+    edgeInfo.push({ mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], nx, ny, w: st.w });
+    const segs = [];
+    if (st.dash) {
+      const cnt = Math.max(2, Math.round(len / (st.w * 3.6)));
+      const period = len / cnt, on = period * 0.56;
+      for (let s = 0; s < cnt; s++)
+        segs.push([(s * period + (period - on) / 2) / len, (s * period + (period + on) / 2) / len]);
+    } else segs.push([0, 1]);
+    for (const [t0, t1] of segs) {
+      const p0 = [a[0] + ex * t0, a[1] + ey * t0];
+      const p1 = [a[0] + ex * t1, a[1] + ey * t1];
+      const o = pos.length / 3;
+      pos.push(
+        p0[0], p0[1], 0, p1[0], p1[1], 0,
+        p1[0] + nx * st.w, p1[1] + ny * st.w, 0,
+        p0[0] + nx * st.w, p0[1] + ny * st.w, 0
+      );
+      idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
+      quadEdge.push(i);
+    }
+  }
+  return { pos, idx, quadEdge, edgeInfo };
+}
+
+function disposeBuilt() {
+  if (!built) return;
+  inner.clear();
+  for (const o of built.dispose) {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  }
+  built = null;
+}
+
+function buildPoly() {
+  const faces = model.faces;
+  const dispose = [], items = [];
+  let minInr = Infinity, minEdge = Infinity;
+  for (const f of faces) {
+    let per = 0, ar = 0;
+    for (let k = 0; k < f.poly.length; k++) {
+      const a = f.poly[k], b = f.poly[(k + 1) % f.poly.length];
+      const e = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      per += e;
+      minEdge = Math.min(minEdge, e);
+      ar += a[0] * b[1] - b[0] * a[1];
+    }
+    minInr = Math.min(minInr, Math.abs(ar) / per);
+  }
+  const w = Math.min(minEdge * 0.085, minInr * 0.22);
+
+  faces.forEach((f, fi) => {
+    const n = f.poly.length;
+    let per = 0, ar = 0;
+    for (let k = 0; k < n; k++) {
+      const a = f.poly[k], b = f.poly[(k + 1) % n];
+      per += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      ar += a[0] * b[1] - b[0] * a[1];
+    }
+    const inr = Math.abs(ar) / per;   // この面に収まるラベルの大きさの目安
+    const gm = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+    f.poly.forEach((p, k) => {
+      pos[k * 3] = p[0]; pos[k * 3 + 1] = p[1];
+      nor[k * 3 + 2] = 1;
+    });
+    gm.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    gm.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    gm.setIndex(fanIndices(n));
+    const mesh = new THREE.Mesh(gm, new THREE.MeshStandardMaterial({
+      color: faceColor(f.kind, fi), side: THREE.DoubleSide,
+      roughness: 0.62, metalness: 0.02, flatShading: true,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    }));
+    mesh.matrixAutoUpdate = false;
+    inner.add(mesh);
+    dispose.push(mesh);
+
+    const bs = borderStrip(f.poly, (k) =>
+      f.edges[k].type === "fold" ? { w: w * 0.5, dash: true } : { w, dash: false });
+    const bg = new THREE.BufferGeometry();
+    bg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(bs.pos), 3));
+    bg.setAttribute("color", new THREE.BufferAttribute(new Float32Array(bs.pos.length), 3));
+    bg.setIndex(bs.idx);
+    const bmesh = new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    bmesh.matrixAutoUpdate = false;
+    bmesh.renderOrder = 2;
+    inner.add(bmesh);
+    dispose.push(bmesh);
+
+    // 面の番号
+    const numSprite = makeSprite(discTexture(String(fi + 1), "rgba(255,255,255,.95)", "#15202b"));
+    dispose.push(numSprite);
+
+    // くっつく辺の番号（展開図の上でだけ意味がある）
+    let cx = 0, cy = 0;
+    for (const p of f.poly) { cx += p[0]; cy += p[1]; }
+    cx /= n; cy /= n;
+    const badges = [];
+    f.edges.forEach((e, k) => {
+      if (e.type !== "cut" || e.pair < 0) return;
+      const hexv = CUD[e.pair % CUD.length];
+      const sp = makeSprite(discTexture(String(e.pair + 1), hex6(hexv), inkOn(hexv)));
+      dispose.push(sp);
+      const ei = bs.edgeInfo[k];
+      badges.push({ sp, at: [ei.mid[0] + ei.nx * w * 3.1, ei.mid[1] + ei.ny * w * 3.1] });
+    });
+
+    // 頂点の記号（展開図では同じ記号が何か所にも現れ、組み立てると1点に集まる）
+    const vlabels = f.poly.map((p, k) => ({
+      sp: (() => {
+        const s = makeSprite(discTexture(String.fromCharCode(65 + (f.v3[k] % 26)), "rgba(255,255,255,.95)", "#15202b"));
+        dispose.push(s);
+        return s;
+      })(),
+      at: [p[0] + (cx - p[0]) * 0.19, p[1] + (cy - p[1]) * 0.19],
+    }));
+
+    items.push({ f, mesh, bmesh, numSprite, badges, vlabels, quadEdge: bs.quadEdge, center: [cx, cy], inr });
+  });
+  built = { kind: "poly", items, dispose };
+  paintBorders();
+}
+
+function paintBorders() {
+  if (!built || built.kind !== "poly") return;
+  for (const it of built.items) {
+    const col = it.bmesh.geometry.getAttribute("color");
+    it.quadEdge.forEach((ei, q) => {
+      const e = it.f.edges[ei];
+      const c = e.type === "fold" ? new THREE.Color(COL_FOLD)
+        : opt.pair && e.pair >= 0 ? pairColor(e.pair) : new THREE.Color(COL_CUT);
+      for (let v = 0; v < 4; v++) col.setXYZ(q * 4 + v, c.r, c.g, c.b);
+    });
+    col.needsUpdate = true;
+  }
+}
+
+/* ---- 円柱・円錐 ---- */
+const SEG = 120;
+function smoothBuild() {
+  const dispose = [];
+  const grid = (cols, rows) => {
+    const idx = [];
+    for (let i = 0; i < cols; i++)
+      for (let j = 0; j < rows; j++) {
+        const a = i * (rows + 1) + j, b = a + rows + 1;
+        idx.push(a, b, b + 1, a, b + 1, a + 1);
+      }
+    return idx;
+  };
+  const mk = (color, count, idx) => {
+    const gm = new THREE.BufferGeometry();
+    gm.setAttribute("position", new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+    gm.setIndex(idx);
+    const m = new THREE.Mesh(gm, new THREE.MeshStandardMaterial({
+      color, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.02,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    }));
+    inner.add(m); dispose.push(m);
+    return m;
+  };
+  const ribbon = () => {
+    const gm = new THREE.BufferGeometry();
+    gm.setAttribute("position", new THREE.BufferAttribute(new Float32Array((SEG + 1) * 2 * 3), 3));
+    gm.setIndex(grid(SEG, 1));
+    const m = new THREE.Mesh(gm, new THREE.MeshBasicMaterial({ color: COL_CUT, side: THREE.DoubleSide }));
+    m.renderOrder = 2;
+    inner.add(m); dispose.push(m);
+    return m;
+  };
+  const lateral = mk(COL_SIDE, (SEG + 1) * 2, grid(SEG, 1));
+  const discs = [mk(COL_BASE, SEG + 2, fanIndices(SEG + 2))];
+  if (model.type === "cylinder") discs.push(mk(COL_BASE, SEG + 2, fanIndices(SEG + 2)));
+  const ribs = [ribbon(), ribbon(), ribbon(), ribbon()];
+  const rings = [ribbon()];
+  if (model.type === "cylinder") rings.push(ribbon());
+  built = { kind: "smooth", lateral, discs, ribs, rings, dispose };
+  paintSmooth();
+}
+function paintSmooth() {
+  if (!built || built.kind !== "smooth") return;
+  const c = (i) => (opt.pair ? pairColor(i) : new THREE.Color(COL_CUT));
+  if (model.type === "cylinder") {
+    built.ribs[0].material.color.copy(c(0));  // 長方形の下の辺 ＝ 底面の円
+    built.ribs[1].material.color.copy(c(1));  // 上の辺 ＝ 上面の円
+    built.ribs[2].material.color.copy(c(2));  // 左右の辺どうし
+    built.ribs[3].material.color.copy(c(2));
+    built.rings[0].material.color.copy(c(0));
+    built.rings[1].material.color.copy(c(1));
+  } else {
+    built.ribs[0].material.color.copy(c(0));  // おうぎ形の弧 ＝ 底面の円
+    built.ribs[1].material.color.copy(c(1));  // 母線どうし
+    built.ribs[2].material.color.copy(c(1));
+    built.ribs[3].visible = false;
+    built.rings[0].material.color.copy(c(0));
+  }
+}
+
+/* ================= 折りたたみ ================= */
+const tmpQ = new THREE.Quaternion(), qa = new THREE.Quaternion();
+const smoothstep = (x) => x * x * (3 - 2 * x);
+
+function polyPoints(tt) {
+  const frames = G.foldFrames(model, tt);
+  const pts = [];
+  model.faces.forEach((f, fi) => {
+    const fr = frames[fi];
+    for (const p of f.poly) pts.push(G.applyFrame(fr, [p[0], p[1], 0]));
+  });
+  return { frames, pts };
+}
+function smoothPoints(tt) {
+  const m = model, pts = [];
+  if (m.type === "cylinder") {
+    for (let i = 0; i <= SEG; i++)
+      for (const y of [0, m.h]) pts.push(G.cylPoint(m, (i / SEG) * m.L, y, tt));
+    for (const top of [false, true])
+      for (let i = 0; i <= SEG; i++) {
+        const a = (i / SEG) * TAU;
+        pts.push(G.cylBasePoint(m, m.r * Math.sin(a), m.r * (1 - Math.cos(a)), top, tt));
+      }
+  } else {
+    for (let i = 0; i <= SEG; i++)
+      for (const rho of [0, m.l]) pts.push(G.conePoint(m, rho, (i / SEG) * m.theta, tt));
+    for (let i = 0; i <= SEG; i++) {
+      const a = (i / SEG) * TAU;
+      pts.push(G.coneBasePoint(m, m.r * Math.sin(a), m.r * (1 - Math.cos(a)), tt));
+    }
+  }
+  return pts;
+}
+function centerOf(pts) {
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const p of pts) for (let i = 0; i < 3; i++) { lo[i] = Math.min(lo[i], p[i]); hi[i] = Math.max(hi[i], p[i]); }
+  return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+}
+function maxRadius(pts, c) {
+  let r = 0;
+  for (const p of pts) r = Math.max(r, Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]));
+  return r;
+}
+function setBuf(mesh, pts) {
+  const a = mesh.geometry.getAttribute("position");
+  for (let i = 0; i < pts.length; i++) a.setXYZ(i, pts[i][0], pts[i][1], pts[i][2]);
+  a.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  mesh.geometry.computeBoundingSphere();
+}
+
+const qWorld = new THREE.Quaternion();
+const vTmp = new THREE.Vector3();
+
+function applyFold(tt) {
+  const R = radiusAt(tt);
+  root.scale.setScalar(1 / R);
+  if (!userMoved) {
+    cam.phi = 0.46 + (1.03 - 0.46) * smoothstep(tt);
+    placeCamera();
+  }
+  const badgeOp = Math.min(1, Math.max(0, (0.72 - tt) / 0.18));
+  // ラベルは面のどちら側にも来るので、つねにカメラ側へ少し浮かせる
+  qa.set(model.pose[0], model.pose[1], model.pose[2], model.pose[3]);
+  tmpQ.identity();
+  pose.quaternion.copy(opt.pose ? tmpQ.slerp(qa, smoothstep(tt)) : tmpQ);
+  pose.updateMatrix();
+  qWorld.copy(root.quaternion).multiply(pose.quaternion);
+  const liftSign = (fr) =>
+    vTmp.set(fr.R[2], fr.R[5], fr.R[8]).applyQuaternion(qWorld).dot(camera.position) >= 0 ? 1 : -1;
+  if (model.type === "poly") {
+    const { frames } = polyPoints(tt);
+    const pts = [];
+    model.faces.forEach((f, fi) => {
+      const fr = frames[fi];
+      const it = built.items[fi];
+      it.mesh.matrix.set(
+        fr.R[0], fr.R[1], fr.R[2], fr.T[0],
+        fr.R[3], fr.R[4], fr.R[5], fr.T[1],
+        fr.R[6], fr.R[7], fr.R[8], fr.T[2],
+        0, 0, 0, 1
+      );
+      it.bmesh.matrix.copy(it.mesh.matrix);
+      for (const p of f.poly) pts.push(G.applyFrame(fr, [p[0], p[1], 0]));
+      const lift = liftSign(fr) * R * 0.02;
+      if (opt.num) {
+        const q = G.applyFrame(fr, [it.center[0], it.center[1], lift]);
+        it.numSprite.position.set(q[0], q[1], q[2]);
+        it.numSprite.scale.setScalar(Math.min(R * 0.13, it.inr * 0.95));
+      }
+      if (opt.pair) {
+        const s = Math.min(R * 0.1, it.inr * 0.62);
+        for (const b of it.badges) {
+          const q = G.applyFrame(fr, [b.at[0], b.at[1], lift]);
+          b.sp.position.set(q[0], q[1], q[2]);
+          b.sp.scale.setScalar(s);
+          b.sp.material.opacity = badgeOp;
+          b.sp.visible = badgeOp > 0.02;
+        }
+      }
+      if (opt.vtx) {
+        const s = Math.min(R * 0.085, it.inr * 0.5);
+        for (const v of it.vlabels) {
+          const q = G.applyFrame(fr, [v.at[0], v.at[1], lift]);
+          v.sp.position.set(q[0], q[1], q[2]);
+          v.sp.scale.setScalar(s);
+        }
+      }
+    });
+    const c = centerOf(pts);
+    inner.position.set(-c[0], -c[1], -c[2]);
+  } else {
+    const m = model;
+    const lat = [], d0 = [], d1 = [], rb = [[], [], [], []], rg = [[], []];
+    const W = Math.min(m.r, 1) * 0.05 + 0.02;
+    if (m.type === "cylinder") {
+      for (let i = 0; i <= SEG; i++) {
+        const s = (i / SEG) * m.L;
+        lat.push(G.cylPoint(m, s, 0, tt), G.cylPoint(m, s, m.h, tt));
+        rb[0].push(G.cylPoint(m, s, 0, tt), G.cylPoint(m, s, W, tt));
+        rb[1].push(G.cylPoint(m, s, m.h, tt), G.cylPoint(m, s, m.h - W, tt));
+      }
+      for (let i = 0; i <= SEG; i++) {
+        const y = (i / SEG) * m.h;
+        rb[2].push(G.cylPoint(m, 0, y, tt), G.cylPoint(m, W, y, tt));
+        rb[3].push(G.cylPoint(m, m.L, y, tt), G.cylPoint(m, m.L - W, y, tt));
+      }
+      for (const [top, arr, ring] of [[false, d0, rg[0]], [true, d1, rg[1]]]) {
+        arr.push(G.cylBasePoint(m, 0, m.r, top, tt));
+        for (let i = 0; i <= SEG; i++) {
+          const a = (i / SEG) * TAU, si = Math.sin(a), co = Math.cos(a);
+          arr.push(G.cylBasePoint(m, m.r * si, m.r * (1 - co), top, tt));
+          ring.push(
+            G.cylBasePoint(m, m.r * si, m.r * (1 - co), top, tt),
+            G.cylBasePoint(m, (m.r - W) * si, m.r - (m.r - W) * co, top, tt)
+          );
+        }
+      }
+    } else {
+      for (let i = 0; i <= SEG; i++) {
+        const psi = (i / SEG) * m.theta;
+        lat.push(G.conePoint(m, 0, psi, tt), G.conePoint(m, m.l, psi, tt));
+        rb[0].push(G.conePoint(m, m.l, psi, tt), G.conePoint(m, m.l - W, psi, tt));
+      }
+      for (let i = 0; i <= SEG; i++) {
+        const rho = (i / SEG) * m.l;
+        const dp = Math.min(m.theta / 4, W / Math.max(rho, W));
+        rb[1].push(G.conePoint(m, rho, 0, tt), G.conePoint(m, rho, dp, tt));
+        rb[2].push(G.conePoint(m, rho, m.theta, tt), G.conePoint(m, rho, m.theta - dp, tt));
+      }
+      d0.push(G.coneBasePoint(m, 0, m.r, tt));
+      for (let i = 0; i <= SEG; i++) {
+        const a = (i / SEG) * TAU, si = Math.sin(a), co = Math.cos(a);
+        d0.push(G.coneBasePoint(m, m.r * si, m.r * (1 - co), tt));
+        rg[0].push(
+          G.coneBasePoint(m, m.r * si, m.r * (1 - co), tt),
+          G.coneBasePoint(m, (m.r - W) * si, m.r - (m.r - W) * co, tt)
+        );
+      }
+    }
+    setBuf(built.lateral, lat);
+    setBuf(built.discs[0], d0);
+    if (built.discs[1]) setBuf(built.discs[1], d1);
+    built.ribs.forEach((r, i) => { if (rb[i].length) setBuf(r, rb[i]); });
+    built.rings.forEach((r, i) => { if (rg[i].length) setBuf(r, rg[i]); });
+    const c = centerOf(lat.concat(d0, d1));
+    inner.position.set(-c[0], -c[1], -c[2]);
+  }
+}
+const draw = () => renderer.render(scene, camera);
+const redraw = () => { if (model) applyFold(t); draw(); };
+
+/* ================= 見取図・展開図のアイコン（SVG） ================= */
+const VIEW_DIR = G.norm([1.05, -1.55, 0.72]);
+function svgWrap(inner) {
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${inner}</svg>`;
+}
+function fitPts(pts, pad) {
+  let lo = [Infinity, Infinity], hi = [-Infinity, -Infinity];
+  for (const p of pts) {
+    lo[0] = Math.min(lo[0], p[0]); lo[1] = Math.min(lo[1], p[1]);
+    hi[0] = Math.max(hi[0], p[0]); hi[1] = Math.max(hi[1], p[1]);
+  }
+  const s = (100 - 2 * pad) / Math.max(hi[0] - lo[0], hi[1] - lo[1], 1e-6);
+  return (p) => [
+    pad + (100 - 2 * pad - (hi[0] - lo[0]) * s) / 2 + (p[0] - lo[0]) * s,
+    pad + (100 - 2 * pad - (hi[1] - lo[1]) * s) / 2 + (p[1] - lo[1]) * s,
+  ];
+}
+const ptsAttr = (ps) => ps.map((p) => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" ");
+
+/** 立体の見取図：見えている面だけを、向きに応じた濃さで塗る */
+function svgSolid(solid) {
+  if (solid.type === "cylinder") return svgCylinder();
+  if (solid.type === "cone") return svgCone();
+  const w = VIEW_DIR;
+  const u = G.norm(G.cross([0, 0, 1], w));
+  const v = G.cross(w, u);
+  const flat = solid.verts.map((p) => [G.dot(p, u), -G.dot(p, v)]);
+  const map = fitPts(flat, 9);
+  const P = flat.map(map);
+  const light = G.norm([0.45, -0.7, 0.95]);
+  let out = "";
+  solid.faces.forEach((f) => {
+    const n = G.faceNormal(solid.verts, f);
+    if (G.dot(n, w) <= 0.002) return;
+    const sh = (0.14 + 0.4 * Math.max(0, G.dot(n, light))).toFixed(2);
+    out += `<polygon points="${ptsAttr(f.map((i) => P[i]))}" fill="currentColor" fill-opacity="${sh}" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>`;
+  });
+  return svgWrap(out);
+}
+const svgCylinder = () => svgWrap(
+  `<path d="M24,30 L24,74 A26 8 0 0 0 76,74 L76,30 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>` +
+  `<ellipse cx="50" cy="30" rx="26" ry="8" fill="currentColor" fill-opacity="0.42" stroke="currentColor" stroke-width="2.6"/>`
+);
+const svgCone = () => svgWrap(
+  `<ellipse cx="50" cy="76" rx="26" ry="8" fill="currentColor" fill-opacity="0.42" stroke="currentColor" stroke-width="2.6"/>` +
+  `<path d="M50,18 L24,76 A26 8 0 0 0 76,76 Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>`
+);
+
+/** 展開図のアイコン：いまの切り方をそのまま平面で描く */
+function svgNet(m) {
+  if (m.type === "cylinder") {
+    const pts = [[0, 0], [m.L, 0], [m.L, m.h + 2 * m.r], [0, m.h + 2 * m.r]];
+    const map = fitPts(pts, 8);
+    const a = map([0, m.r]), b = map([m.L, m.r + m.h]);
+    const c0 = map([m.L / 2, 0]), c1 = map([m.L / 2, m.h + 2 * m.r]);
+    const rr = Math.abs(map([m.r, 0])[0] - map([0, 0])[0]);
+    return svgWrap(
+      `<rect x="${a[0].toFixed(1)}" y="${a[1].toFixed(1)}" width="${(b[0] - a[0]).toFixed(1)}" height="${(b[1] - a[1]).toFixed(1)}" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2.6"/>` +
+      `<circle cx="${c0[0].toFixed(1)}" cy="${c0[1].toFixed(1)}" r="${rr.toFixed(1)}" fill="currentColor" fill-opacity="0.42" stroke="currentColor" stroke-width="2.6"/>` +
+      `<circle cx="${c1[0].toFixed(1)}" cy="${c1[1].toFixed(1)}" r="${rr.toFixed(1)}" fill="currentColor" fill-opacity="0.42" stroke="currentColor" stroke-width="2.6"/>`
+    );
+  }
+  if (m.type === "cone") {
+    const arc = [];
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * m.theta;
+      arc.push([m.l * Math.cos(a), m.l * Math.sin(a)]);
+    }
+    const cc = [(m.l + m.r) * Math.cos(m.theta / 2), (m.l + m.r) * Math.sin(m.theta / 2)];
+    const all = [[0, 0], ...arc, [cc[0] - m.r, cc[1]], [cc[0] + m.r, cc[1]], [cc[0], cc[1] - m.r], [cc[0], cc[1] + m.r]];
+    const map = fitPts(all, 8);
+    const o = map([0, 0]), s = map(arc[0]), e = map(arc[arc.length - 1]);
+    const rl = Math.hypot(s[0] - o[0], s[1] - o[1]);
+    const c = map(cc);
+    const rr = Math.abs(map([m.r, 0])[0] - map([0, 0])[0]);
+    const large = m.theta > Math.PI ? 1 : 0;
+    return svgWrap(
+      `<path d="M${o[0].toFixed(1)},${o[1].toFixed(1)} L${s[0].toFixed(1)},${s[1].toFixed(1)} A${rl.toFixed(1)} ${rl.toFixed(1)} 0 ${large} 1 ${e[0].toFixed(1)},${e[1].toFixed(1)} Z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>` +
+      `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${rr.toFixed(1)}" fill="currentColor" fill-opacity="0.42" stroke="currentColor" stroke-width="2.6"/>`
+    );
+  }
+  const all = [];
+  for (const f of m.faces) for (const p of f.poly) all.push(p);
+  const map = fitPts(all, 7);
+  let out = "";
+  for (const f of m.faces) {
+    const op = f.kind === "base" ? 0.42 : 0.2;
+    out += `<polygon points="${ptsAttr(f.poly.map(map))}" fill="currentColor" fill-opacity="${op}" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>`;
+  }
+  return svgWrap(out);
+}
+
+/* ================= 画面をつくる ================= */
+function renderPicker() {
+  const host = $("picker");
+  host.textContent = "";
+  const groups = [];
+  for (const p of G.PRESETS) {
+    let g = groups.find((x) => x.name === p.group);
+    if (!g) groups.push((g = { name: p.group, items: [] }));
+    g.items.push(p);
+  }
+  for (const g of groups) {
+    const h = document.createElement("div");
+    h.className = "gl";
+    h.textContent = g.name;
+    host.appendChild(h);
+    const grid = document.createElement("div");
+    grid.className = "tiles";
+    for (const p of g.items) {
+      const b = document.createElement("button");
+      b.className = "tile";
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(p === preset));
+      b.innerHTML = svgSolid(p.build({ ...p.params }));
+      const s = document.createElement("span");
+      s.textContent = p.name;
+      b.appendChild(s);
+      b.addEventListener("click", () => {
+        if (p === preset) return;
+        preset = p;
+        params = { ...p.params };
+        variant = 0;
+        rebuild();
+        renderPicker();
+        renderControls();
+      });
+      grid.appendChild(b);
+    }
+    host.appendChild(grid);
+  }
+}
+
+function renderControls() {
+  const host = $("controls");
+  host.textContent = "";
+  for (const c of preset.controls) {
+    const wrap = document.createElement("div");
+    wrap.className = "ctl";
+    const top = document.createElement("div");
+    top.className = "top";
+    const id = "p_" + c.key;
+    const lab = document.createElement("label");
+    lab.htmlFor = id;
+    lab.textContent = c.label;
+    const out = document.createElement("output");
+    out.htmlFor = id;
+    out.textContent = fmt(params[c.key], c.step < 1 ? 2 : 0);
+    top.append(lab, out);
+    const r = document.createElement("input");
+    r.type = "range"; r.id = id;
+    r.min = c.min; r.max = c.max; r.step = c.step; r.value = params[c.key];
+    r.addEventListener("input", () => {
+      params[c.key] = Number(r.value);
+      out.textContent = fmt(params[c.key], c.step < 1 ? 2 : 0);
+      rebuild(true);
+    });
+    wrap.append(top, r);
+    host.appendChild(wrap);
+  }
+}
+
+function renderOpts() {
+  const host = $("opts");
+  host.textContent = "";
+  for (const tg of TOGGLES) {
+    const l = document.createElement("label");
+    l.className = "opt";
+    const i = document.createElement("input");
+    i.type = "checkbox";
+    i.id = "o_" + tg.k;
+    i.checked = opt[tg.k];
+    i.addEventListener("change", () => {
+      opt[tg.k] = i.checked;
+      applyLooks();
+      renderStats();
+      applyFold(t);
+      draw();
+    });
+    l.append(i, document.createTextNode(tg.label));
+    host.appendChild(l);
+  }
+}
+
+const GLYPH = {
+  face: `<svg viewBox="0 0 24 24"><polygon points="4,7 20,4 20,17 4,20" fill="currentColor" fill-opacity=".35" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>`,
+  edge: `<svg viewBox="0 0 24 24"><line x1="4" y1="19" x2="20" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>`,
+  vert: `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.6" fill="currentColor"/></svg>`,
+};
+
+function renderStats() {
+  const counts = $("counts"), eu = $("euler"), tb = $("stats"), nt = $("notes"), lg = $("legend");
+  counts.textContent = ""; tb.textContent = ""; nt.textContent = ""; lg.textContent = "";
+  const count = (glyph, n, label) => {
+    const d = document.createElement("div");
+    d.className = "count";
+    d.innerHTML = glyph + `<b>${n}</b>`;
+    const s = document.createElement("span");
+    s.textContent = label;
+    d.appendChild(s);
+    counts.appendChild(d);
+  };
+  const row = (k, v) => {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th"); th.textContent = k;
+    const td = document.createElement("td"); td.textContent = v;
+    tr.append(th, td); tb.appendChild(tr);
+  };
+  const note = (html) => {
+    const d = document.createElement("div");
+    d.innerHTML = html;
+    nt.appendChild(d);
+  };
+  const leg = (cls, color, text) => {
+    const s = document.createElement("span");
+    const i = document.createElement("i");
+    if (cls) i.className = cls; else i.style.background = color;
+    s.append(i, document.createTextNode(text));
+    lg.appendChild(s);
+  };
+
+  if (model.type === "poly") {
+    const st = model.stats;
+    counts.hidden = false;
+    count(GLYPH.face, st.F, "面");
+    count(GLYPH.edge, st.E, "辺");
+    count(GLYPH.vert, st.V, "頂点");
+    eu.hidden = false;
+    eu.textContent = `頂点 − 辺 + 面 ＝ ${st.V} − ${st.E} + ${st.F} ＝ ${st.V - st.E + st.F}`;
+    row("表面積", fmt(st.area));
+    row("体積", fmt(st.volume));
+    row("くっつく辺の組", String(model.pairCount) + " 組");
+    const base = model.faces.find((f) => f.kind === "base");
+    if (base && (preset.id === "prism" || preset.id === "box")) {
+      let per = 0;
+      for (let k = 0; k < base.poly.length; k++) {
+        const a = base.poly[k], b = base.poly[(k + 1) % base.poly.length];
+        per += Math.hypot(b[0] - a[0], b[1] - a[1]);
+      }
+      note(`側面をならべた長方形のよこ ＝ 底面のまわりの長さ ＝ <b>${fmt(per)}</b>`);
+    }
+    if (preset.group === "角柱") note("体積 ＝ 底面積 × 高さ");
+    if (preset.group === "角錐") note("体積 ＝ 底面積 × 高さ ÷ 3");
+    if (preset.group === "正多面体") note("どの多面体でも <b>頂点 − 辺 + 面 ＝ 2</b>（オイラーの多面体定理）");
+    if (preset.id === "cube") note("立方体の展開図は、全部で <b>11 種類</b>あります。");
+    if (model.faces.some((f) => f.kind === "side")) {
+      leg(null, hex6(COL_SIDE), "側面");
+      leg(null, hex6(COL_BASE), "底面");
+    }
+  } else {
+    const m = model, st = m.stats;
+    counts.hidden = false;
+    eu.hidden = true;
+    if (m.type === "cylinder") {
+      count(GLYPH.vert, fmt(m.r), "半径 r");
+      count(GLYPH.edge, fmt(m.h), "高さ h");
+      count(GLYPH.face, fmt(st.side), "円周 2πr");
+      row("側面積", fmt(st.lateral));
+      row("表面積", fmt(st.area));
+      row("体積", fmt(st.volume));
+      note(`側面の長方形は、よこ ＝ 底面の円周 ＝ 2πr ＝ <b>${fmt(st.side)}</b>、たて ＝ 高さ ＝ <b>${fmt(m.h)}</b>`);
+      note("表面積 ＝ πr² × 2 ＋ 2πr × h　／　体積 ＝ πr² × h");
+    } else {
+      count(GLYPH.vert, fmt(m.r), "半径 r");
+      count(GLYPH.edge, fmt(m.h), "高さ h");
+      count(GLYPH.face, fmt(m.l), "母線 ℓ");
+      row("おうぎ形の中心角", fmt(st.deg, 1) + "°");
+      row("弧の長さ 2πr", fmt(st.arc));
+      row("側面積 πrℓ", fmt(st.lateral));
+      row("表面積", fmt(st.area));
+      row("体積", fmt(st.volume));
+      note(`中心角 ＝ 360° × r ÷ ℓ ＝ 360° × ${fmt(m.r)} ÷ ${fmt(m.l)} ＝ <b>${fmt(st.deg, 1)}°</b>`);
+      note(`おうぎ形の弧と底面の円は同じ長さ ＝ <b>${fmt(st.arc)}</b>`);
+      note("表面積 ＝ πr² ＋ πrℓ　／　体積 ＝ πr² × h ÷ 3");
+    }
+    leg(null, hex6(COL_SIDE), "側面");
+    leg(null, hex6(COL_BASE), "底面");
+  }
+  leg("dash", null, "折り目");
+  if (opt.pair) leg(null, hex6(CUD[0]), "同じ色・同じ番号の辺がくっつく");
+}
+
+function applyLooks() {
+  if (!built) return;
+  if (built.kind === "poly") {
+    for (const it of built.items) {
+      const mt = it.mesh.material;
+      mt.transparent = opt.glass;
+      mt.opacity = opt.glass ? 0.45 : 1;
+      mt.depthWrite = !opt.glass;
+      mt.needsUpdate = true;
+      it.numSprite.visible = opt.num;
+      for (const b of it.badges) b.sp.visible = opt.pair;
+      for (const v of it.vlabels) v.sp.visible = opt.vtx;
+    }
+    paintBorders();
+  } else {
+    for (const m of [built.lateral, ...built.discs]) {
+      m.material.transparent = opt.glass;
+      m.material.opacity = opt.glass ? 0.45 : 1;
+      m.material.depthWrite = !opt.glass;
+      m.material.needsUpdate = true;
+    }
+    paintSmooth();
+  }
+}
+
+function rebuild(keepT) {
+  let m;
+  try {
+    m = G.buildModel(preset, params, variant);
+  } catch (err) {
+    console.error(err);
+    return;
+  }
+  model = m;
+  disposeBuilt();
+  if (model.type === "poly") buildPoly(); else smoothBuild();
+
+  radii = [];
+  const N = 16;
+  for (let i = 0; i <= N; i++) {
+    const tt = i / N;
+    const pts = model.type === "poly" ? polyPoints(tt).pts : smoothPoints(tt);
+    radii.push(maxRadius(pts, centerOf(pts)) || 1);
+  }
+  radius = Math.max(...radii);
+
+  applyLooks();
+  renderStats();
+  $("caption").innerHTML = `<b>${preset.name}</b> — ${preset.note}`;
+  $("revar").hidden = model.type !== "poly";
+  $("thNet").innerHTML = svgNet(model);
+  $("thSolid").innerHTML = svgSolid(model.type === "poly" ? model.solid : model);
+  if (!keepT) t = Number($("t").value);
+  applyFold(t);
+  draw();
+}
+
+/* ---- 操作 ---- */
+const slider = $("t");
+function paintSlider() {
+  slider.style.setProperty("--p", (t * 100).toFixed(1) + "%");
+}
+function updateBadge() {
+  $("badge").textContent = t < 0.004 ? "展開図" : t > 0.996 ? "立体" : `組み立て中 ${Math.round(t * 100)}%`;
+}
+function setT(v) {
+  t = Math.min(1, Math.max(0, v));
+  slider.value = t;
+  paintSlider();
+  applyFold(t);
+  updateBadge();
+  draw();
+}
+slider.addEventListener("input", () => {
+  setPlaying(false);
+  setT(Number(slider.value));
+});
+function setPlaying(on) {
+  playing = on;
+  $("play").setAttribute("aria-pressed", String(on));
+  $("play").textContent = on ? "❙❙" : "▶";
+  if (on) { lastT = performance.now(); requestAnimationFrame(tick); }
+}
+$("play").addEventListener("click", () => setPlaying(!playing));
+$("toFlat").addEventListener("click", () => { setPlaying(false); setT(0); });
+$("toSolid").addEventListener("click", () => { setPlaying(false); setT(1); });
+$("revar").addEventListener("click", () => {
+  variant = (variant + 1) % 7;
+  rebuild(true);
+});
+addEventListener("keydown", (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === "range") return;
+  if (e.code === "Space") { e.preventDefault(); setPlaying(!playing); }
+  else if (e.key === "ArrowRight") setT(t + 0.05);
+  else if (e.key === "ArrowLeft") setT(t - 0.05);
+});
+function tick(now) {
+  if (!playing) return;
+  const dt = Math.min(0.05, (now - lastT) / 1000);
+  lastT = now;
+  t += dirSign * dt * 0.4;
+  if (t >= 1) { t = 1; dirSign = -1; }
+  else if (t <= 0) { t = 0; dirSign = 1; }
+  slider.value = t;
+  paintSlider();
+  applyFold(t);
+  updateBadge();
+  draw();
+  requestAnimationFrame(tick);
+}
+
+placeCamera();
+renderPicker();
+renderControls();
+renderOpts();
+rebuild();
+resize();
+paintSlider();
+updateBadge();
+</script>
