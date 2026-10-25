@@ -1105,8 +1105,9 @@ function applyLooks() {
   if (built.kind === "poly") {
     for (const it of built.items) {
       const mt = it.mesh.material;
-      mt.transparent = opt.glass;
-      mt.opacity = opt.glass ? 0.45 : 1;
+      // 既定でもわずかに透かし、裏の辺や奥の面の気配が見えるようにする
+      mt.transparent = true;
+      mt.opacity = opt.glass ? 0.45 : 0.85;
       mt.depthWrite = !opt.glass;
       mt.needsUpdate = true;
       it.numSprite.visible = opt.num;
@@ -1116,8 +1117,8 @@ function applyLooks() {
     paintBorders();
   } else {
     for (const m of [built.lateral, ...built.discs]) {
-      m.material.transparent = opt.glass;
-      m.material.opacity = opt.glass ? 0.45 : 1;
+      m.material.transparent = true;
+      m.material.opacity = opt.glass ? 0.45 : 0.85;
       m.material.depthWrite = !opt.glass;
       m.material.needsUpdate = true;
     }
