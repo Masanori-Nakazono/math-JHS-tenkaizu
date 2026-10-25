@@ -496,7 +496,8 @@ function buildPoly() {
     }
     minInr = Math.min(minInr, Math.abs(ar) / per);
   }
-  const w = Math.min(minEdge * 0.085, minInr * 0.22);
+  // 辺のふちどりの幅。いちばん短い辺と、いちばん小さい面に収まる大きさで決める
+  const w = Math.min(minEdge * 0.057, minInr * 0.147);
 
   faces.forEach((f, fi) => {
     const n = f.poly.length;
@@ -760,7 +761,7 @@ function applyFold(tt) {
   } else {
     const m = model;
     const lat = [], d0 = [], d1 = [], rb = [[], [], [], []], rg = [[], []];
-    const W = Math.min(m.r, 1) * 0.05 + 0.02;
+    const W = Math.min(m.r, 1) * 0.033 + 0.013;   // 多面体の辺と同じ細さに合わせる
     if (m.type === "cylinder") {
       for (let i = 0; i <= SEG; i++) {
         const s = (i / SEG) * m.L;
